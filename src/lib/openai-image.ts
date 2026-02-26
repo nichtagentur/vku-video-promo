@@ -1,14 +1,14 @@
 import OpenAI from 'openai';
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+function getClient() {
+  return new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+}
 
 export async function generateSceneBackground(
   sceneText: string,
   eventTitle: string
 ): Promise<string> {
-  const response = await openai.images.generate({
+  const response = await getClient().images.generate({
     model: 'gpt-image-1',
     prompt: `Abstract professional background for a corporate web seminar promo video.
 Theme: "${sceneText}" for event "${eventTitle}".

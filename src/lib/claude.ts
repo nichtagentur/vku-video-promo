@@ -2,9 +2,9 @@ import Anthropic from '@anthropic-ai/sdk';
 import { ScrapedEvent, Scene } from '@/types';
 import { BRAND } from './brand';
 
-const anthropic = new Anthropic({
-  apiKey: process.env.CLAUDE_API_KEY_1,
-});
+function getClient() {
+  return new Anthropic({ apiKey: process.env.CLAUDE_API_KEY_1 });
+}
 
 export async function generateVideoScript(event: ScrapedEvent): Promise<Scene[]> {
   const prompt = `Du bist ein Social-Media-Texter fuer VKU Service GmbH (kommunaldigital.de).
@@ -33,7 +33,7 @@ Antworte NUR als JSON-Array mit diesem Format:
 Verwende abwechselnd die Transitions: "fade", "slide-left", "slide-up", "zoom".
 Die Dauer sollte zwischen 3 und 5 Sekunden pro Szene liegen.`;
 
-  const message = await anthropic.messages.create({
+  const message = await getClient().messages.create({
     model: 'claude-sonnet-4-20250514',
     max_tokens: 1024,
     messages: [{ role: 'user', content: prompt }],
