@@ -32,6 +32,9 @@ export default function VideoPreview({ scenes, format, onTimeUpdate, engineRef }
     });
     eng.setOnPlayStateChange(setPlaying);
 
+    // Expose engine for headless automation
+    (window as any).__canvasEngine = eng;
+
     return () => eng.destroy();
   }, []);
 
@@ -47,8 +50,11 @@ export default function VideoPreview({ scenes, format, onTimeUpdate, engineRef }
     eng.setScenes(scenes);
     setTotalDuration(eng.getTotalDuration());
 
-    // Preload background images
+    // Preload background images and videos
     scenes.forEach(s => {
+      if (s.backgroundVideo) {
+        eng.loadVideo(s.backgroundVideo).then(() => eng.render());
+      }
       if (s.backgroundImage) {
         eng.loadImage(s.backgroundImage).then(() => eng.render());
       }

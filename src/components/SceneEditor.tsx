@@ -8,6 +8,9 @@ interface SceneEditorProps {
   onUpdate: (updated: Scene) => void;
   onGenerateImage: (sceneId: string) => void;
   generatingImage?: boolean;
+  onGenerateVideo?: (sceneId: string) => void;
+  generatingVideo?: boolean;
+  eventImage?: string;
 }
 
 const TRANSITIONS: Scene['transition'][] = ['fade', 'slide-left', 'slide-up', 'zoom', 'cut'];
@@ -21,7 +24,7 @@ const BG_COLORS = [
   { label: 'Dunkelblau', value: '#0c2d48' },
 ];
 
-export default function SceneEditor({ scene, onUpdate, onGenerateImage, generatingImage }: SceneEditorProps) {
+export default function SceneEditor({ scene, onUpdate, onGenerateImage, generatingImage, onGenerateVideo, generatingVideo, eventImage }: SceneEditorProps) {
   const update = (partial: Partial<Scene>) => {
     onUpdate({ ...scene, ...partial });
   };
@@ -130,7 +133,7 @@ export default function SceneEditor({ scene, onUpdate, onGenerateImage, generati
       <div>
         <button
           onClick={() => onGenerateImage(scene.id)}
-          disabled={generatingImage}
+          disabled={generatingImage || generatingVideo}
           className="w-full py-2 px-3 rounded-md text-xs font-semibold border border-vku-border hover:bg-gray-50 transition-colors disabled:opacity-50"
         >
           {generatingImage ? 'Bild wird generiert...' : 'KI-Hintergrundbild generieren'}
@@ -144,6 +147,27 @@ export default function SceneEditor({ scene, onUpdate, onGenerateImage, generati
           </button>
         )}
       </div>
+
+      {/* Generate video from event image */}
+      {eventImage && onGenerateVideo && (
+        <div>
+          <button
+            onClick={() => onGenerateVideo(scene.id)}
+            disabled={generatingVideo || generatingImage}
+            className="w-full py-2 px-3 rounded-md text-xs font-semibold border-2 border-vku-accent text-vku-accent hover:bg-vku-accent/5 transition-colors disabled:opacity-50"
+          >
+            {generatingVideo ? 'Video wird generiert (~60s)...' : 'Video-Clip aus Eventbild generieren'}
+          </button>
+          {scene.backgroundVideo && (
+            <button
+              onClick={() => update({ backgroundVideo: undefined })}
+              className="w-full mt-1 py-1 px-3 rounded-md text-xs text-gray-500 hover:text-vku-accent transition-colors"
+            >
+              Video entfernen
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }

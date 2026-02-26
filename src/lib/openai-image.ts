@@ -10,13 +10,13 @@ export async function generateSceneBackground(
 ): Promise<string> {
   const response = await getClient().images.generate({
     model: 'gpt-image-1',
-    prompt: `Abstract professional background for a corporate web seminar promo video.
+    prompt: `Professional photo for a corporate web seminar promo video.
 Theme: "${sceneText}" for event "${eventTitle}".
-Style: Modern, clean, dark blue and white corporate design. Abstract geometric shapes, subtle gradients.
-NO text, NO words, NO letters in the image. Only abstract visual elements.
-Suitable as a background with text overlay.`,
+Show diverse business professionals in a modern conference or office setting. Realistic, warm lighting, shallow depth of field.
+People should appear engaged, collaborative, and approachable. Mix of ages and backgrounds.
+NO text, NO words, NO letters in the image. The image will be used as a background with text overlay, so keep composition slightly out of focus or with space for text.`,
     n: 1,
-    size: '1024x1024',
+    size: '1024x1536',
     quality: 'medium',
   });
 

@@ -5,12 +5,13 @@ export class CanvasEngine {
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
   private scenes: Scene[] = [];
-  private format: VideoFormat = '16:9';
+  private format: VideoFormat = '4:5';
   private currentTime = 0;
   private playing = false;
   private animFrameId = 0;
   private lastTimestamp = 0;
   private imageCache = new Map<string, HTMLImageElement>();
+  private videoCache = new Map<string, HTMLVideoElement>();
   private onTimeUpdate?: (time: number) => void;
   private onPlayStateChange?: (playing: boolean) => void;
 
@@ -50,8 +51,24 @@ export class CanvasEngine {
 
   seekTo(time: number) {
     this.currentTime = Math.max(0, Math.min(time, this.getTotalDuration()));
+    // Sync video elements with scene time
+    this.syncVideosToTime(this.currentTime);
     this.render();
     this.onTimeUpdate?.(this.currentTime);
+  }
+
+  private syncVideosToTime(globalTime: number) {
+    let elapsed = 0;
+    for (const scene of this.scenes) {
+      if (scene.backgroundVideo && this.videoCache.has(scene.backgroundVideo)) {
+        const video = this.videoCache.get(scene.backgroundVideo)!;
+        if (globalTime >= elapsed && globalTime < elapsed + scene.duration) {
+          const sceneTime = globalTime - elapsed;
+          video.currentTime = sceneTime % (video.duration || scene.duration);
+        }
+      }
+      elapsed += scene.duration;
+    }
   }
 
   play() {
@@ -62,12 +79,16 @@ export class CanvasEngine {
     this.playing = true;
     this.lastTimestamp = performance.now();
     this.onPlayStateChange?.(true);
+    // Start all cached videos
+    this.videoCache.forEach(v => { v.play().catch(() => {}); });
     this.tick();
   }
 
   pause() {
     this.playing = false;
     cancelAnimationFrame(this.animFrameId);
+    // Pause all cached videos
+    this.videoCache.forEach(v => v.pause());
     this.onPlayStateChange?.(false);
   }
 
@@ -139,9 +160,13 @@ export class CanvasEngine {
   private renderScene(scene: Scene, progress: number, transitionProgress: number) {
     const { width, height } = this.canvas;
     const ctx = this.ctx;
+    const isOutro = scene.id === 'outro';
 
-    // Background
-    if (scene.backgroundImage && this.imageCache.has(scene.backgroundImage)) {
+    // Background - video takes priority over image
+    if (scene.backgroundVideo && this.videoCache.has(scene.backgroundVideo)) {
+      const video = this.videoCache.get(scene.backgroundVideo)!;
+      this.renderVideoFrame(video);
+    } else if (scene.backgroundImage && this.imageCache.has(scene.backgroundImage)) {
       const img = this.imageCache.get(scene.backgroundImage)!;
       this.renderKenBurns(img, progress);
     } else {
@@ -154,7 +179,7 @@ export class CanvasEngine {
     }
 
     // Semi-transparent overlay for text readability
-    if (scene.backgroundImage) {
+    if (scene.backgroundVideo || scene.backgroundImage) {
       ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
       ctx.fillRect(0, 0, width, height);
     }
@@ -179,7 +204,32 @@ export class CanvasEngine {
     ctx.textBaseline = 'middle';
 
     const textY = height * 0.5 + slideOffset;
+
+    // Pulsing glow effect for outro CTA
+    if (isOutro) {
+      const pulse = 0.5 + 0.5 * Math.sin(progress * Math.PI * 4);
+      ctx.shadowColor = BRAND.colors.accent;
+      ctx.shadowBlur = 20 + pulse * 15;
+      ctx.shadowOffsetX = 0;
+      ctx.shadowOffsetY = 0;
+    }
+
     this.wrapText(ctx, scene.text, width / 2, textY, width * 0.8, fontSize * 1.2);
+
+    // Reset shadow after main text
+    if (isOutro) {
+      ctx.shadowColor = 'transparent';
+      ctx.shadowBlur = 0;
+    }
+
+    // Animated underline bar for outro
+    if (isOutro) {
+      const barWidth = Math.min(progress * 1.5, 1) * width * 0.4;
+      const barX = (width - barWidth) / 2;
+      const barY = textY + fontSize * 0.8;
+      ctx.fillStyle = BRAND.colors.accent;
+      ctx.fillRect(barX, barY, barWidth, 4 * (width / 1080));
+    }
 
     // Subtext
     if (scene.subtext) {
@@ -197,6 +247,30 @@ export class CanvasEngine {
     const barHeight = height * 0.04;
     ctx.fillStyle = BRAND.colors.primary;
     ctx.fillRect(0, height - barHeight, width, barHeight);
+  }
+
+  private renderVideoFrame(video: HTMLVideoElement) {
+    const { width, height } = this.canvas;
+    const ctx = this.ctx;
+
+    if (video.readyState < 2) return; // Not enough data yet
+
+    // Cover-fit the video frame
+    const vidRatio = video.videoWidth / video.videoHeight;
+    const canvasRatio = width / height;
+    let drawW, drawH, drawX, drawY;
+    if (vidRatio > canvasRatio) {
+      drawH = height;
+      drawW = height * vidRatio;
+      drawX = (width - drawW) / 2;
+      drawY = 0;
+    } else {
+      drawW = width;
+      drawH = width / vidRatio;
+      drawX = 0;
+      drawY = (height - drawH) / 2;
+    }
+    ctx.drawImage(video, drawX, drawY, drawW, drawH);
   }
 
   private renderKenBurns(img: HTMLImageElement, progress: number) {
@@ -264,6 +338,24 @@ export class CanvasEngine {
     return `rgb(${Math.round(r)}, ${Math.round(g)}, ${Math.round(b)})`;
   }
 
+  async loadVideo(dataUri: string): Promise<void> {
+    if (this.videoCache.has(dataUri)) return;
+    return new Promise((resolve, reject) => {
+      const video = document.createElement('video');
+      video.muted = true;
+      video.loop = true;
+      video.playsInline = true;
+      video.preload = 'auto';
+      video.oncanplaythrough = () => {
+        this.videoCache.set(dataUri, video);
+        resolve();
+      };
+      video.onerror = () => reject(new Error('Failed to load video'));
+      video.src = dataUri;
+      video.load();
+    });
+  }
+
   async loadImage(url: string): Promise<void> {
     if (this.imageCache.has(url)) return;
     return new Promise((resolve, reject) => {
@@ -285,5 +377,11 @@ export class CanvasEngine {
   destroy() {
     this.pause();
     this.imageCache.clear();
+    this.videoCache.forEach(v => {
+      v.pause();
+      v.removeAttribute('src');
+      v.load();
+    });
+    this.videoCache.clear();
   }
 }

@@ -12,8 +12,9 @@ import SceneEditor from '@/components/SceneEditor';
 import ExportPanel from '@/components/ExportPanel';
 
 const FORMATS: { label: string; value: VideoFormat }[] = [
+  { label: '4:5 Feed', value: '4:5' },
   { label: '9:16 Story', value: '9:16' },
-  { label: '1:1 Feed', value: '1:1' },
+  { label: '1:1 Square', value: '1:1' },
   { label: '16:9 Landscape', value: '16:9' },
 ];
 
@@ -23,11 +24,12 @@ export default function EditorPage() {
 
   const [event, setEvent] = useState<ScrapedEvent | null>(null);
   const [scenes, setScenes] = useState<Scene[]>([]);
-  const [format, setFormat] = useState<VideoFormat>('16:9');
+  const [format, setFormat] = useState<VideoFormat>('4:5');
   const [selectedSceneId, setSelectedSceneId] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState(0);
   const [showExport, setShowExport] = useState(false);
   const [generatingImageFor, setGeneratingImageFor] = useState<string | null>(null);
+  const [generatingVideoFor, setGeneratingVideoFor] = useState<string | null>(null);
 
   useEffect(() => {
     const eventData = sessionStorage.getItem('currentEvent');
@@ -82,6 +84,29 @@ export default function EditorPage() {
       setGeneratingImageFor(null);
     }
   }, [event, scenes]);
+
+  const handleGenerateVideo = useCallback(async (sceneId: string) => {
+    if (!event?.image) return;
+
+    setGeneratingVideoFor(sceneId);
+    try {
+      const res = await fetch('/api/generate-video', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imageUrl: event.image }),
+      });
+      const data = await res.json();
+      if (data.videoUrl) {
+        setScenes(prev => prev.map(s =>
+          s.id === sceneId ? { ...s, backgroundVideo: data.videoUrl, backgroundImage: undefined } : s
+        ));
+      }
+    } catch (err) {
+      console.error('Video generation error:', err);
+    } finally {
+      setGeneratingVideoFor(null);
+    }
+  }, [event]);
 
   const handleExportWebM = useCallback(async (): Promise<Blob> => {
     const engine = engineRef.current;
@@ -155,6 +180,51 @@ export default function EditorPage() {
               ))}
             </div>
 
+            {/* Share buttons */}
+            <div className="flex items-center gap-1.5 border-l border-gray-200 pl-3">
+              <button
+                onClick={() => {
+                  const url = encodeURIComponent(event.url);
+                  const text = encodeURIComponent(`${event.title} - Jetzt anmelden!`);
+                  window.open(`https://www.linkedin.com/sharing/share-offsite/?url=${url}`, '_blank', 'width=600,height=400');
+                }}
+                className="px-2.5 py-1.5 rounded text-xs font-medium bg-[#0A66C2] text-white hover:bg-[#004182] transition-colors"
+                title="Auf LinkedIn teilen"
+              >
+                LinkedIn
+              </button>
+              <button
+                onClick={() => {
+                  const url = encodeURIComponent(event.url);
+                  const text = encodeURIComponent(`${event.title} - Jetzt anmelden!`);
+                  window.open(`https://x.com/intent/tweet?url=${url}&text=${text}`, '_blank', 'width=600,height=400');
+                }}
+                className="px-2.5 py-1.5 rounded text-xs font-medium bg-black text-white hover:bg-gray-800 transition-colors"
+                title="Auf X teilen"
+              >
+                X
+              </button>
+              <button
+                onClick={() => {
+                  const text = encodeURIComponent(`${event.title} - Jetzt anmelden! ${event.url}`);
+                  window.open(`https://wa.me/?text=${text}`, '_blank');
+                }}
+                className="px-2.5 py-1.5 rounded text-xs font-medium bg-[#25D366] text-white hover:bg-[#128C7E] transition-colors"
+                title="Per WhatsApp teilen"
+              >
+                WhatsApp
+              </button>
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(event.url);
+                }}
+                className="px-2.5 py-1.5 rounded text-xs font-medium bg-gray-200 text-gray-700 hover:bg-gray-300 transition-colors"
+                title="Link kopieren"
+              >
+                Copy
+              </button>
+            </div>
+
             <button
               onClick={() => setShowExport(true)}
               className="px-4 py-2 rounded-md text-sm font-semibold text-white transition-colors"
@@ -186,6 +256,9 @@ export default function EditorPage() {
               onUpdate={handleSceneUpdate}
               onGenerateImage={handleGenerateImage}
               generatingImage={generatingImageFor === selectedScene.id}
+              onGenerateVideo={handleGenerateVideo}
+              generatingVideo={generatingVideoFor === selectedScene.id}
+              eventImage={event.image}
             />
           ) : (
             <div className="p-4 text-center text-gray-400 text-sm">

@@ -19,6 +19,7 @@ export interface Scene {
   fontColor: string;
   backgroundColor: string;
   backgroundImage?: string; // base64 or URL
+  backgroundVideo?: string; // data URI for Veo-generated video
   transition: 'fade' | 'slide-left' | 'slide-up' | 'zoom' | 'cut';
   kenBurns?: boolean;
 }
@@ -30,7 +31,7 @@ export interface VideoProject {
   fps: number;
 }
 
-export type VideoFormat = '9:16' | '1:1' | '16:9';
+export type VideoFormat = '4:5' | '9:16' | '1:1' | '16:9';
 
 export interface VideoDimensions {
   width: number;
@@ -38,6 +39,7 @@ export interface VideoDimensions {
 }
 
 export const FORMAT_DIMENSIONS: Record<VideoFormat, VideoDimensions> = {
+  '4:5': { width: 864, height: 1080 },
   '9:16': { width: 1080, height: 1920 },
   '1:1': { width: 1080, height: 1080 },
   '16:9': { width: 1920, height: 1080 },

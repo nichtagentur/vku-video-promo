@@ -40,3 +40,9 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 .env.local
+
+# automation output
+data/output/
+data/logs/
+data/state.json
+public/latest-render.mp4
